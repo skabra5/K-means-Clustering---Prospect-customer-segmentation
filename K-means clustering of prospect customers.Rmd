@@ -1,0 +1,188 @@
+---
+title: "HW5_Sakshi"
+author: "Sakshi Kabra"
+date: "November 29, 2019"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+library(class)
+library(MASS)
+library(dplyr)
+library(readxl)
+
+
+```
+
+```{r}
+
+prospects <- read_xls("prospect.xls")
+
+
+```
+
+```{r}
+
+prospects <- prospects %>% 
+  select(-ID,-LOC)
+
+str(prospects)
+
+#Converting into factor type
+prospects$SEX <- as.factor(prospects$SEX)
+prospects$CLIMATE <- as.factor(prospects$CLIMATE)
+
+summary(prospects)
+
+
+```
+
+
+
+```{r}
+
+
+# Creating dummy variables for SEX
+
+library(caret) 
+
+var_onehot <- c('SEX', "CLIMATE") 
+
+# One Hot Encoding 
+
+dummys <- dummyVars(" ~ .", data = prospects[,var_onehot]) 
+
+dummy_cats <- data.frame(predict(dummys, newdata = prospects[,var_onehot])) 
+
+prospects <- prospects %>% 
+  select(-SEX, -CLIMATE) 
+
+  prospects <- cbind(prospects, dummy_cats)
+  
+  summary(prospects)
+
+
+
+```
+
+
+```{r}
+
+pp <- prospects
+
+#imputing missing values using KNN
+
+library(DMwR)
+knn_prospects <- knnImputation(pp, k=10, scale = T, meth = "weighAvg", distData = NULL) 
+anyNA(knn_prospects)
+
+
+```
+
+
+
+```{r}
+
+prospects <- knn_prospects
+
+# Scaling data
+
+options(digits=2) 
+normalize <- function(x) { 
+return ((x - min(x)) / (max(x) - min(x))) 
+} 
+
+scaled_prospects <- as.data.frame(lapply(prospects[1:10], normalize))
+
+summary(scaled_prospects)
+
+```
+
+Part a.)  
+
+```{r}
+
+set.seed(7)
+kmeans4 <- kmeans(scaled_prospects, centers=4, nstart =100)
+kmeans4
+
+
+```
+
+Part b.)  
+
+```{r}
+
+
+kmeans4$centers
+kmeans4$withinss
+kmeans4$betweenss
+kmeans4$size
+
+cluster1 <- prospects[kmeans4$cluster == 1,]
+summary(cluster1)
+
+cluster2 <- prospects[kmeans4$cluster == 2,]
+summary(cluster2)
+
+cluster3 <- prospects[kmeans4$cluster == 3,]
+summary(cluster3)
+
+cluster4 <- prospects[kmeans4$cluster == 4,]
+summary(cluster4)
+
+```
+
+
+
+
+Part c. 
+We use scree plot and elbow-point to find the best number of clusters.  
+```{r}
+
+
+
+pp <- scaled_prospects
+wss <- (nrow(pp)-1)*sum(sapply(pp,var))
+for (i in 1:15) 
+  wss[i] <- sum(kmeans(pp, centers=i)$withinss)
+plot(1:15, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares",
+     main="Assessing the Optimal Number of Clusters with the Elbow Method", pch=20, cex=2)
+
+
+
+```
+From the Scree plot, I think six clusters (k=6) is the best option.  
+
+
+d.)
+
+```{r}
+
+
+set.seed(7)
+kmeans6 <- kmeans(scaled_prospects, centers=6, nstart =100)
+
+library(cluster)
+ss <- silhouette(kmeans6$cluster, dist(scaled_prospects))
+mean(ss[ ,3])
+
+
+set.seed(7)
+kmeans4 <- kmeans(scaled_prospects, centers=4, nstart =100)
+
+library(cluster)
+ss4 <- silhouette(kmeans4$cluster, dist(scaled_prospects))
+mean(ss4[ ,3])
+
+
+```
+
+The Silhoutte measure for 6 clusters, is 0.38. Higher the Silhoutte coefficient, the better the clusters.  
